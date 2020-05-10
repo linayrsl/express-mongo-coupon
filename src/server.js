@@ -156,4 +156,31 @@ app.delete("/coupon/:id", (req, res) => {
         })
 });
 
+app.post("/coupon/:id/redeem", (req, res) => {
+   db.collection("coupons").findOne({_id: ObjectId(req.params.id)})
+       .then((coupon) => {
+           if (!coupon) {
+               return Promise.reject(HttpStatus.NOT_FOUND);
+           }
+           if (coupon.isRedeem === true) {
+               return Promise.reject(HttpStatus.BAD_REQUEST);
+           }
+           return db.collection("coupons").updateOne({
+               _id: ObjectId(req.params.id)},
+                {$set: {isRedeem: true}});
+       })
+       .then((response) => {
+           res.sendStatus(HttpStatus.OK);
+       })
+       .catch((error) => {
+           if (error === HttpStatus.NOT_FOUND) {
+               return res.sendStatus(HttpStatus.NOT_FOUND);
+           }
+           if (error === HttpStatus.BAD_REQUEST) {
+               return res.sendStatus(HttpStatus.BAD_REQUEST);
+           }
+           res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+       })
+});
+
 app.listen(port, () => console.log(`Server listening on port ${port}!`));
