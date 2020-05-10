@@ -6,6 +6,7 @@ const cors = require("cors");
 const HttpStatus = require("http-status-codes");
 const ObjectId = require("mongodb").ObjectID;
 const Ajv = require("ajv");
+const { v1: uuidv1 } = require('uuid');
 
 const port = 3000;
 
@@ -32,12 +33,11 @@ const couponValidationSchema = {
     type: "object",
     properties: {
         // Any change to properties will affect couponUpdateValidationSchema
-        code: {type: "number", minimum: 10000, maximum: 9999999},
         date: {type: "string", pattern: "^([0-9]{2}/[0-9]{2}/[0-9]{4})$"},
         isRedeem: {type: "boolean"},
         updatedAt: {type: "string"}
     },
-    required: ["code", "date", "isRedeem"],
+    required: ["date", "isRedeem"],
     additionalProperties: false
 };
 
@@ -55,26 +55,18 @@ app.put("/coupon", (req, res) => {
         res.status(HttpStatus.BAD_REQUEST).json({errors: couponValidator.errors});
         return;
     }
-    db.collection("coupons").findOne({code: req.body.code})
-        .then((coupon) => {
-            if (coupon) {
-                return Promise.reject(HttpStatus.CONFLICT)
-            } else {
-                // Setting initial updatedAt timestamp for coupon object
-                req.body["updatedAt"] =  new Date().toISOString();
-                // Returning new promise in case no conflict with existing coupon
-                return db.collection("coupons").insertOne(req.body)
-            }
+    db.collection("coupons")
+        .insertOne({
+            ...req.body,
+            code: uuidv1(),
+            // Setting initial updatedAt timestamp for coupon object
+            updatedAt: new Date().toISOString()
         })
         .then((response) => {
             res.status(HttpStatus.CREATED).json(response.ops[0]);
         })
         .catch((error) => {
-            if (error === HttpStatus.CONFLICT) {
-                res.sendStatus(HttpStatus.CONFLICT);
-            } else {
-                res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
-            }
+            res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         });
 });
 
