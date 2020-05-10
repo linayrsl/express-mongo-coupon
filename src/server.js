@@ -26,6 +26,8 @@ client.connect((error) => {
     console.log("Successful connection to DB");
 });
 
+
+// Defining validation schema to disallow incorrect and malicious input
 const couponValidationSchema = {
     type: "object",
     properties: {
@@ -43,13 +45,14 @@ const couponValidationSchema = {
 const updateCouponValidation =
     { ...couponValidationSchema, required: ["updatedAt"] }
 
-const ajv = new Ajv(); // options can be passed, e.g. {allErrors: true}
-const validator = ajv.compile(couponValidationSchema);
+// Instantiating JsonSchema validator
+const ajv = new Ajv();
+const couponValidator = ajv.compile(couponValidationSchema);
 
 app.put("/coupon", (req, res) => {
-    const isCouponValid = validator(req.body);
+    const isCouponValid = couponValidator(req.body);
     if (!isCouponValid) {
-        res.status(HttpStatus.BAD_REQUEST).json({errors: validator.errors});
+        res.status(HttpStatus.BAD_REQUEST).json({errors: couponValidator.errors});
         return;
     }
     db.collection("coupons").findOne({code: req.body.code})
@@ -57,7 +60,9 @@ app.put("/coupon", (req, res) => {
             if (coupon) {
                 return Promise.reject(HttpStatus.CONFLICT)
             } else {
+                // Setting initial updatedAt timestamp for coupon object
                 req.body["updatedAt"] =  new Date().toISOString();
+                // Returning new promise in case no conflict with existing coupon
                 return db.collection("coupons").insertOne(req.body)
             }
         })
@@ -97,23 +102,28 @@ app.get("/coupon/:id", (req, res) => {
        })
 });
 
-const updateValidator = ajv.compile(updateCouponValidation)
+// Instantiating JsonSchema validator
+const partialCouponValidator = ajv.compile(updateCouponValidation)
+
 app.post("/coupon/:id", (req, res) => {
-    const isCouponUpdateValid = updateValidator(req.body);
+    const isCouponUpdateValid = partialCouponValidator(req.body);
     if (!isCouponUpdateValid) {
-        res.status(HttpStatus.BAD_REQUEST).json({errors: updateValidator.errors});
+        res.status(HttpStatus.BAD_REQUEST).json({errors: partialCouponValidator.errors});
         return;
     }
+    // Find coupon in db to check for correct updatedAt timestamp to prevent concurrent updates
     db.collection("coupons").findOne({_id: ObjectId(req.params.id)})
         .then((coupon) => {
             if (!coupon) {
                 return Promise.reject(HttpStatus.NOT_FOUND);
             }
             if (coupon.updatedAt === req.body.updatedAt) {
+                // Updating coupon only if correct updatedAt timestamp which means that no one changed the coupon before
                 return db.collection("coupons").updateOne(
                     {_id: ObjectId(req.params.id)},
                     {$set: {
                         ...req.body,
+                        // Setting new timestamp for coupon on update
                         updatedAt: new Date().toISOString()}});
             }
             return Promise.reject(HttpStatus.CONFLICT);
@@ -143,7 +153,7 @@ app.delete("/coupon/:id", (req, res) => {
             if (response.value === null) {
                 return Promise.reject(HttpStatus.NOT_FOUND);
             }
-            res.status(HttpStatus.OK).json({message: `The coupon with id: ${response.value._id} was deleted`});
+            res.sendStatus(HttpStatus.OK);
         })
         .catch((error) => {
             if (error === HttpStatus.NOT_FOUND) {
