@@ -20,7 +20,7 @@ let db;
 const client = new MongoClient("mongodb://localhost:27017" , {useUnifiedTopology: true});
 client.connect((error) => {
     if (error) {
-        console.log(error);
+        console.error(error);
         return;
     }
     db = client.db( "app");
@@ -66,6 +66,7 @@ app.put("/coupon", (req, res) => {
             res.status(HttpStatus.CREATED).json(response.ops[0]);
         })
         .catch((error) => {
+            console.error(error);
             res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         });
 });
@@ -76,6 +77,7 @@ app.get("/coupon", (req, res) => {
             res.status(HttpStatus.OK).json(users);
         })
         .catch((error) => {
+            console.error(error);
             res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         })
 });
@@ -90,6 +92,7 @@ app.get("/coupon/:id", (req, res) => {
             res.status(HttpStatus.OK).json(coupon);
         })
        .catch((error) => {
+           console.error(error);
            res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
        })
 });
@@ -135,6 +138,7 @@ app.post("/coupon/:id", (req, res) => {
                 res.sendStatus(HttpStatus.CONFLICT);
                 return;
             }
+            console.error(error);
             res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         })
 });
@@ -152,6 +156,7 @@ app.delete("/coupon/:id", (req, res) => {
                 res.sendStatus(HttpStatus.NOT_FOUND);
                 return;
             }
+            console.error(error);
             res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
         })
 });
@@ -179,6 +184,22 @@ app.post("/coupon/:id/redeem", (req, res) => {
            if (error === HttpStatus.BAD_REQUEST) {
                return res.sendStatus(HttpStatus.BAD_REQUEST);
            }
+           console.error(error);
+           res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
+       })
+});
+
+app.get("/coupon/search/:code", (req, res) => {
+   db.collection("coupons").findOne({code: req.params.code})
+       .then((coupon) => {
+           if (!coupon) {
+               res.sendStatus(HttpStatus.NOT_FOUND);
+               return;
+           }
+           res.status(HttpStatus.OK).json(coupon);
+       })
+       .catch((error) => {
+           console.error(error);
            res.sendStatus(HttpStatus.INTERNAL_SERVER_ERROR);
        })
 });
